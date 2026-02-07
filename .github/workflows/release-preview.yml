@@ -1,0 +1,58 @@
+name: Release Preview
+
+on:
+  workflow_dispatch:
+  push:
+    branches:
+      - main
+
+jobs:
+  preview:
+    runs-on: macos-latest
+    steps:
+      - uses: actions/checkout@v4
+      - name: Validate repository
+        run: |
+          ./scripts/lint.sh
+          swift build --package-path KAMIBotApp
+          ./scripts/test.sh
+      - name: Build release binary
+        run: |
+          if [ ! -d KAMIBotApp ]; then
+            echo "KAMIBotApp package not scaffolded yet"
+            exit 0
+          fi
+          swift build --configuration release --package-path KAMIBotApp
+          mkdir -p dist
+          cp KAMIBotApp/.build/release/KAMIBotApp dist/KAMIBotApp
+      - name: Try sign artifact
+        run: |
+          if [ ! -f dist/KAMIBotApp ]; then
+            exit 0
+          fi
+          IDENTITY=$(security find-identity -v -p codesigning | awk 'NR==1 {print $2}')
+          if [ -n "$IDENTITY" ] && [ "$IDENTITY" != "0" ]; then
+            codesign --force --timestamp --sign "$IDENTITY" dist/KAMIBotApp
+            echo "signed=true" >> $GITHUB_ENV
+          else
+            echo "signed=false" >> $GITHUB_ENV
+          fi
+      - name: Package artifact by signing status
+        run: |
+          if [ ! -f dist/KAMIBotApp ]; then
+            exit 0
+          fi
+          mkdir -p release
+          if [ "$signed" = "true" ]; then
+            cp dist/KAMIBotApp release/KAMIBotApp-signed
+            cd release && zip -r KAMIBotApp-signed.zip KAMIBotApp-signed
+          else
+            cp dist/KAMIBotApp release/KAMIBotApp-unsigned
+            cd release && zip -r KAMIBotApp-unsigned.zip KAMIBotApp-unsigned
+          fi
+      - name: Upload artifact
+        uses: actions/upload-artifact@v4
+        with:
+          name: release-preview
+          path: release/
+          if-no-files-found: ignore

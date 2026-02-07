@@ -1,0 +1,27 @@
+# macOS
+.DS_Store
+
+# Swift / Xcode
+.build/
+DerivedData/
+.swiftpm/
+Package.resolved
+*.xcodeproj/project.xcworkspace/xcuserdata/
+*.xcworkspace/xcuserdata/
+*.xcuserdatad/
+*.xcuserstate
+
+# Logs and temp
+*.log
+*.tmp
+
+# Secrets and environment
+.env
+.env.*
+
+# Local model cache
+models/
+artifacts/models/
+
+# Audio/video captures
+captures/

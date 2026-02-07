@@ -1,0 +1,45 @@
+name: CI
+
+on:
+  pull_request:
+  push:
+    branches:
+      - main
+      - codex/**
+
+jobs:
+  lint:
+    name: lint
+    runs-on: macos-latest
+    steps:
+      - uses: actions/checkout@v4
+        with:
+          fetch-depth: 0
+      - name: Lint
+        run: ./scripts/lint.sh
+      - name: Guardrails
+        run: ./scripts/ci-guardrails.sh
+
+  build:
+    name: build
+    runs-on: macos-latest
+    needs: lint
+    steps:
+      - uses: actions/checkout@v4
+      - name: Build
+        run: |
+          if [ -d KAMIBotApp ]; then
+            swift build --package-path KAMIBotApp
+          else
+            echo "KAMIBotApp package not scaffolded yet"
+          fi
+
+  test:
+    name: test
+    runs-on: macos-latest
+    needs: build
+    steps:
+      - uses: actions/checkout@v4
+      - name: Test
+        run: |
+          ./scripts/test.sh
