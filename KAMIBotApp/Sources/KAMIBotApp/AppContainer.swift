@@ -14,14 +14,20 @@ struct AppContainer {
     let startupChecks: [StartupCheckResult]
     let modelDescriptor: ModelDescriptor
 
-    init(config: AgentConfig = AgentConfig()) {
+    init(
+        config: AgentConfig = AgentConfig(),
+        recordingDirectory: URL? = nil
+    ) {
         let enforcedConfig = Self.enforcePolicy(config)
 
         let wakeWord = PorcupineWakeWordService(keyword: enforcedConfig.wakeWord)
         let stt = WhisperSpeechToTextService()
         let tts = AVSpeechSynthesizerService()
         let permissionProvider = SystemMicrophonePermissionProvider()
-        let recorder = LocalAudioRecorderService(permissionProvider: permissionProvider)
+        let recorder = LocalAudioRecorderService(
+            permissionProvider: permissionProvider,
+            outputDirectory: recordingDirectory
+        )
         self.audioRecorderService = recorder
 
         let modelStore = URL(fileURLWithPath: FileManager.default.currentDirectoryPath)

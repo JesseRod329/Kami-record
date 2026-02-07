@@ -1,3 +1,4 @@
+import AppKit
 import SwiftUI
 
 struct SettingsView: View {
@@ -12,6 +13,23 @@ struct SettingsView: View {
             Form {
                 TextField("Wake word", text: $settingsStore.wakeWord)
                 Toggle("Enable vision (v1.1 path)", isOn: $settingsStore.visionEnabled)
+
+                VStack(alignment: .leading, spacing: 8) {
+                    Text("Recordings folder")
+                        .font(.caption)
+                        .foregroundStyle(.secondary)
+                    Text(settingsStore.recordingsDirectoryPath)
+                        .font(.caption.monospaced())
+                        .lineLimit(2)
+                        .truncationMode(.middle)
+
+                    Button("Choose Folder") {
+                        if let selected = chooseFolder() {
+                            settingsStore.recordingsDirectoryPath = selected.path
+                        }
+                    }
+                    .font(.caption)
+                }
 
                 VStack(alignment: .leading, spacing: 4) {
                     Toggle("Enable telemetry", isOn: $settingsStore.telemetryEnabled)
@@ -38,5 +56,16 @@ struct SettingsView: View {
         }
         .padding(20)
         .frame(width: 420)
+    }
+
+    private func chooseFolder() -> URL? {
+        let panel = NSOpenPanel()
+        panel.canChooseDirectories = true
+        panel.canChooseFiles = false
+        panel.allowsMultipleSelection = false
+        panel.canCreateDirectories = true
+        panel.prompt = "Use Folder"
+        panel.directoryURL = settingsStore.recordingsDirectoryURL
+        return panel.runModal() == .OK ? panel.url : nil
     }
 }

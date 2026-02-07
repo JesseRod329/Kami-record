@@ -14,6 +14,7 @@ final class RecorderViewModel {
     var elapsedTime: TimeInterval = 0
     var audioLevel: Double = 0
     var latestRecording: RecordingArtifact?
+    var outputDirectory: URL?
     var errorMessage: String?
 
     init(
@@ -51,6 +52,17 @@ final class RecorderViewModel {
 
     func refreshLatestRecording() async {
         latestRecording = await recorderService.latestRecording()
+        outputDirectory = await recorderService.outputDirectory()
+    }
+
+    func setOutputDirectory(_ url: URL) async {
+        do {
+            try await recorderService.setOutputDirectory(url)
+            outputDirectory = await recorderService.outputDirectory()
+            errorMessage = nil
+        } catch {
+            errorMessage = "Unable to use save folder: \(error.localizedDescription)"
+        }
     }
 
     func toggleRecording() async {
@@ -116,13 +128,11 @@ final class RecorderViewModel {
         meteringTask?.cancel()
         meteringTask = Task { [weak self] in
             while !Task.isCancelled {
-                try? await Task.sleep(nanoseconds: 120_000_000)
+                try? await Task.sleep(nanoseconds: 150_000_000)
                 guard let self else {
                     return
                 }
-                await MainActor.run {
-                    self.updateMeterTick()
-                }
+                self.updateMeterTick()
             }
         }
     }
@@ -144,8 +154,8 @@ final class RecorderViewModel {
         let elapsed = max(0, now().timeIntervalSince(recordingStartedAt))
         elapsedTime = elapsed
 
-        let oscillation = abs(sin(elapsed * 4.8))
-        audioLevel = 0.18 + (oscillation * 0.82)
+        let oscillation = abs(sin(elapsed * 4.2))
+        audioLevel = 0.2 + (oscillation * 0.75)
     }
 
     private static let elapsedFormatter: DateComponentsFormatter = {

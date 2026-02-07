@@ -44,6 +44,8 @@ public protocol AudioRecorderService: Sendable {
     func stopRecording() async throws -> RecordingArtifact
     func cancelRecording() async
     func latestRecording() async -> RecordingArtifact?
+    func outputDirectory() async -> URL
+    func setOutputDirectory(_ url: URL) async throws
 }
 
 public enum AudioRecorderError: Error, Equatable {
@@ -51,6 +53,7 @@ public enum AudioRecorderError: Error, Equatable {
     case notRecording
     case failedToStart
     case failedToSave
+    case invalidOutputDirectory
 }
 
 public actor PorcupineWakeWordService: WakeWordService {
@@ -191,7 +194,7 @@ private let defaultRecorderSettings: [String: Any] = [
 
 public actor LocalAudioRecorderService: AudioRecorderService {
     private let permissionProvider: MicrophonePermissionProviding
-    private let capturesDirectory: URL
+    private var capturesDirectory: URL
     private let fileManager: FileManager
     private let now: @Sendable () -> Date
     private let recorderFactory: RecorderFactory
@@ -205,11 +208,11 @@ public actor LocalAudioRecorderService: AudioRecorderService {
 
     public init(
         permissionProvider: MicrophonePermissionProviding = SystemMicrophonePermissionProvider(),
-        baseDirectory: URL = URL(fileURLWithPath: FileManager.default.currentDirectoryPath),
+        outputDirectory: URL? = nil,
         fileManager: FileManager = .default
     ) {
         self.permissionProvider = permissionProvider
-        self.capturesDirectory = baseDirectory.appendingPathComponent("captures", isDirectory: true)
+        self.capturesDirectory = outputDirectory ?? Self.defaultOutputDirectory(fileManager: fileManager)
         self.fileManager = fileManager
         self.now = { Date() }
         self.recorderFactory = { url, settings in
@@ -313,6 +316,26 @@ public actor LocalAudioRecorderService: AudioRecorderService {
         latestArtifact
     }
 
+    public func outputDirectory() async -> URL {
+        capturesDirectory
+    }
+
+    public func setOutputDirectory(_ url: URL) async throws {
+        guard state != .recording, state != .saving else {
+            throw AudioRecorderError.alreadyRecording
+        }
+        capturesDirectory = try validatedOutputDirectory(url)
+    }
+
+    public static func defaultOutputDirectory(fileManager: FileManager = .default) -> URL {
+        if let downloads = fileManager.urls(for: .downloadsDirectory, in: .userDomainMask).first {
+            return downloads.appendingPathComponent("KamiRecord", isDirectory: true)
+        }
+
+        return URL(fileURLWithPath: fileManager.currentDirectoryPath)
+            .appendingPathComponent("captures", isDirectory: true)
+    }
+
     private func ensureMicrophonePermission() async throws {
         let permission = permissionProvider.currentPermission()
         switch permission {
@@ -332,6 +355,24 @@ public actor LocalAudioRecorderService: AudioRecorderService {
 
     private static func filename(for date: Date) -> String {
         timestampFormatter.string(from: date)
+    }
+
+    private func validatedOutputDirectory(_ url: URL) throws -> URL {
+        let directory = url.standardizedFileURL
+        var isDirectory: ObjCBool = false
+        if fileManager.fileExists(atPath: directory.path, isDirectory: &isDirectory) {
+            guard isDirectory.boolValue else {
+                throw AudioRecorderError.invalidOutputDirectory
+            }
+            return directory
+        }
+
+        do {
+            try fileManager.createDirectory(at: directory, withIntermediateDirectories: true)
+            return directory
+        } catch {
+            throw AudioRecorderError.invalidOutputDirectory
+        }
     }
 
     private static let timestampFormatter: DateFormatter = {

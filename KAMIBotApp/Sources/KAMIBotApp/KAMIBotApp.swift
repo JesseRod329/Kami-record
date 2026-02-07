@@ -8,7 +8,10 @@ struct KAMIBotApp: App {
 
     init() {
         let settingsStore = SettingsStore()
-        let container = AppContainer(config: settingsStore.toAgentConfig())
+        let container = AppContainer(
+            config: settingsStore.toAgentConfig(),
+            recordingDirectory: settingsStore.recordingsDirectoryURL
+        )
         _settingsStore = State(initialValue: settingsStore)
         _viewModel = State(
             initialValue: BMOViewModel(

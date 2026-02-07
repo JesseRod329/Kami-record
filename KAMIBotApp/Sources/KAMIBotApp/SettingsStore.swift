@@ -1,3 +1,4 @@
+import AudioPipeline
 import CoreAgent
 import Foundation
 import Observation
@@ -9,6 +10,7 @@ final class SettingsStore {
         static let wakeWord = "settings.wakeWord"
         static let visionEnabled = "settings.visionEnabled"
         static let telemetryEnabled = "settings.telemetryEnabled"
+        static let recordingsDirectoryPath = "settings.recordingsDirectoryPath"
     }
 
     var wakeWord: String {
@@ -18,6 +20,7 @@ final class SettingsStore {
     }
 
     var visionEnabled: Bool
+    var recordingsDirectoryPath: String
 
     var telemetryEnabled: Bool {
         didSet {
@@ -30,9 +33,15 @@ final class SettingsStore {
 
     init(defaults: UserDefaults = .standard) {
         let storedWakeWord = defaults.string(forKey: Keys.wakeWord) ?? "BMO"
+        let defaultRecordingsDirectory = LocalAudioRecorderService.defaultOutputDirectory().path
         self.wakeWord = storedWakeWord.trimmingCharacters(in: .whitespacesAndNewlines)
         self.visionEnabled = defaults.object(forKey: Keys.visionEnabled) as? Bool ?? false
+        self.recordingsDirectoryPath = defaults.string(forKey: Keys.recordingsDirectoryPath) ?? defaultRecordingsDirectory
         self.telemetryEnabled = false
+    }
+
+    var recordingsDirectoryURL: URL {
+        URL(fileURLWithPath: recordingsDirectoryPath, isDirectory: true)
     }
 
     func toAgentConfig() -> AgentConfig {
@@ -50,6 +59,7 @@ final class SettingsStore {
     func save(defaults: UserDefaults = .standard) {
         defaults.set(wakeWord, forKey: Keys.wakeWord)
         defaults.set(visionEnabled, forKey: Keys.visionEnabled)
+        defaults.set(recordingsDirectoryPath, forKey: Keys.recordingsDirectoryPath)
         defaults.set(false, forKey: Keys.telemetryEnabled)
     }
 }

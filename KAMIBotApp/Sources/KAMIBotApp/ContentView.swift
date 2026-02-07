@@ -21,11 +21,17 @@ struct ContentView: View {
             .padding(.top, 16)
 
             if mode == .recorder {
-                RecorderView(viewModel: recorderViewModel)
+                RecorderView(viewModel: recorderViewModel, settingsStore: settingsStore)
+                    .transition(.asymmetric(
+                        insertion: .scale(scale: 0.86, anchor: .top).combined(with: .opacity),
+                        removal: .opacity
+                    ))
             } else {
                 assistantView
+                    .transition(.opacity)
             }
         }
+        .animation(.spring(response: 0.4, dampingFraction: 0.85), value: mode)
         .background(
             LinearGradient(
                 colors: [Color.cyan.opacity(0.18), Color.blue.opacity(0.08), Color.clear],

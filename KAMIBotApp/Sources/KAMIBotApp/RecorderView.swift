@@ -1,13 +1,22 @@
+import AppKit
 import SwiftUI
 import UIComponents
 
 struct RecorderView: View {
     @Bindable var viewModel: RecorderViewModel
+    @Bindable var settingsStore: SettingsStore
+    @State private var hasSprungIn = false
+    @State private var tapBump = false
 
     var body: some View {
         VStack(spacing: 12) {
             GlassSurface {
                 VStack(spacing: 14) {
+                    Capsule()
+                        .fill(Color.white.opacity(0.28))
+                        .frame(width: 86, height: 5)
+                        .padding(.top, 2)
+
                     HStack(spacing: 10) {
                         Label("Simple Recorder", systemImage: "waveform")
                             .font(.headline)
@@ -25,6 +34,11 @@ struct RecorderView: View {
 
                     HStack(spacing: 16) {
                         Button {
+                            tapBump = true
+                            Task {
+                                try? await Task.sleep(nanoseconds: 130_000_000)
+                                tapBump = false
+                            }
                             Task {
                                 await viewModel.toggleRecording()
                             }
@@ -38,14 +52,10 @@ struct RecorderView: View {
                                     .font(.system(size: 28, weight: .bold))
                                     .foregroundStyle(.white)
                             }
-                            .scaleEffect(viewModel.isRecording ? 1.08 : 1.0)
+                            .scaleEffect(recordButtonScale)
                             .shadow(color: recordButtonColor.opacity(0.45), radius: 14, y: 6)
-                            .animation(
-                                viewModel.isRecording
-                                    ? .easeInOut(duration: 0.8).repeatForever(autoreverses: true)
-                                    : .easeOut(duration: 0.2),
-                                value: viewModel.isRecording
-                            )
+                            .animation(.spring(response: 0.24, dampingFraction: 0.72), value: tapBump)
+                            .animation(.linear(duration: 0.15), value: viewModel.audioLevel)
                         }
                         .buttonStyle(.plain)
                         .accessibilityLabel(viewModel.primaryButtonTitle)
@@ -66,6 +76,9 @@ struct RecorderView: View {
                 .padding(.vertical, 4)
             }
             .frame(maxWidth: 460)
+            .scaleEffect(hasSprungIn ? 1 : 0.84, anchor: .top)
+            .offset(y: hasSprungIn ? 0 : -26)
+            .opacity(hasSprungIn ? 1 : 0.12)
 
             if let latest = viewModel.latestRecording {
                 Text("Last capture: \(latest.fileURL.lastPathComponent) · \(formatted(date: latest.createdAt))")
@@ -85,6 +98,39 @@ struct RecorderView: View {
                     .foregroundStyle(.red)
                     .multilineTextAlignment(.center)
             }
+
+            if let outputDirectory = viewModel.outputDirectory {
+                HStack(spacing: 8) {
+                    Text("Save folder:")
+                        .font(.caption)
+                        .foregroundStyle(.secondary)
+
+                    Text(outputDirectory.path)
+                        .font(.caption.monospaced())
+                        .lineLimit(1)
+                        .truncationMode(.middle)
+                        .foregroundStyle(.secondary)
+
+                    Spacer(minLength: 4)
+
+                    Button("Choose Folder") {
+                        if let selected = chooseFolder() {
+                            settingsStore.recordingsDirectoryPath = selected.path
+                            settingsStore.save()
+                            Task {
+                                await viewModel.setOutputDirectory(selected)
+                            }
+                        }
+                    }
+                    .font(.caption)
+
+                    Button("Open") {
+                        NSWorkspace.shared.activateFileViewerSelecting([outputDirectory])
+                    }
+                    .font(.caption)
+                }
+                .padding(.horizontal, 6)
+            }
         }
         .padding(.top, 10)
         .padding(.horizontal, 18)
@@ -96,7 +142,14 @@ struct RecorderView: View {
             )
         )
         .task {
+            await viewModel.setOutputDirectory(settingsStore.recordingsDirectoryURL)
             await viewModel.refreshLatestRecording()
+        }
+        .onAppear {
+            hasSprungIn = false
+            withAnimation(.interactiveSpring(response: 0.46, dampingFraction: 0.82, blendDuration: 0.1)) {
+                hasSprungIn = true
+            }
         }
     }
 
@@ -117,8 +170,24 @@ struct RecorderView: View {
         viewModel.isRecording ? .red : .pink
     }
 
+    private var recordButtonScale: Double {
+        let livePulse = viewModel.isRecording ? (1 + (viewModel.audioLevel * 0.08)) : 1.0
+        return tapBump ? max(1.12, livePulse + 0.05) : livePulse
+    }
+
     private func formatted(date: Date) -> String {
         Self.captureDateFormatter.string(from: date)
+    }
+
+    private func chooseFolder() -> URL? {
+        let panel = NSOpenPanel()
+        panel.canChooseDirectories = true
+        panel.canChooseFiles = false
+        panel.allowsMultipleSelection = false
+        panel.canCreateDirectories = true
+        panel.prompt = "Use Folder"
+        panel.directoryURL = viewModel.outputDirectory ?? settingsStore.recordingsDirectoryURL
+        return panel.runModal() == .OK ? panel.url : nil
     }
 
     private static let captureDateFormatter: DateFormatter = {

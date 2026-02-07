@@ -57,6 +57,17 @@ final class RecorderViewModelTests: XCTestCase {
         await viewModel.refreshLatestRecording()
 
         XCTAssertEqual(viewModel.latestRecording?.fileURL, expected.fileURL)
+        XCTAssertEqual(viewModel.outputDirectory?.path, "/tmp")
+    }
+
+    func testSetOutputDirectoryUpdatesServiceAndState() async {
+        let service = MockAudioRecorderService()
+        let viewModel = RecorderViewModel(recorderService: service)
+        let folder = URL(fileURLWithPath: "/tmp/kami-recordings", isDirectory: true)
+
+        await viewModel.setOutputDirectory(folder)
+
+        XCTAssertEqual(viewModel.outputDirectory?.path, folder.path)
     }
 }
 
@@ -64,22 +75,28 @@ actor MockAudioRecorderService: AudioRecorderService {
     private let startError: Error?
     private let stopError: Error?
     private let stopArtifact: RecordingArtifact
+    private let setDirectoryError: Error?
     private var latestArtifact: RecordingArtifact?
+    private var currentDirectory: URL
 
     init(
         startError: Error? = nil,
         stopError: Error? = nil,
+        setDirectoryError: Error? = nil,
         stopArtifact: RecordingArtifact = RecordingArtifact(
             fileURL: URL(fileURLWithPath: "/tmp/default-capture.m4a"),
             duration: 2.0,
             createdAt: Date(timeIntervalSince1970: 100)
         ),
-        latestArtifact: RecordingArtifact? = nil
+        latestArtifact: RecordingArtifact? = nil,
+        outputDirectory: URL = URL(fileURLWithPath: "/tmp", isDirectory: true)
     ) {
         self.startError = startError
         self.stopError = stopError
+        self.setDirectoryError = setDirectoryError
         self.stopArtifact = stopArtifact
         self.latestArtifact = latestArtifact
+        self.currentDirectory = outputDirectory
     }
 
     func startRecording() async throws {
@@ -100,5 +117,16 @@ actor MockAudioRecorderService: AudioRecorderService {
 
     func latestRecording() async -> RecordingArtifact? {
         latestArtifact
+    }
+
+    func outputDirectory() async -> URL {
+        currentDirectory
+    }
+
+    func setOutputDirectory(_ url: URL) async throws {
+        if let setDirectoryError {
+            throw setDirectoryError
+        }
+        currentDirectory = url
     }
 }

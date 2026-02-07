@@ -181,6 +181,36 @@ final class AudioPipelineTests: XCTestCase {
         }
     }
 
+    func testRecorderCanSwitchOutputDirectory() async {
+        let firstDir = FileManager.default.temporaryDirectory
+            .appendingPathComponent(UUID().uuidString, isDirectory: true)
+        let secondDir = FileManager.default.temporaryDirectory
+            .appendingPathComponent(UUID().uuidString, isDirectory: true)
+        defer {
+            try? FileManager.default.removeItem(at: firstDir)
+            try? FileManager.default.removeItem(at: secondDir)
+        }
+
+        let provider = MockPermissionProvider(current: .authorized, requested: .authorized)
+        let service = LocalAudioRecorderService(
+            permissionProvider: provider,
+            capturesDirectory: firstDir,
+            now: { Date() },
+            recorderFactory: { url, _ in
+                MockAudioRecordingSession(url: url)
+            }
+        )
+
+        do {
+            try await service.setOutputDirectory(secondDir)
+            try await service.startRecording()
+            let artifact = try await service.stopRecording()
+            XCTAssertTrue(artifact.fileURL.path.hasPrefix(secondDir.path))
+        } catch {
+            XCTFail("Expected recorder directory switch to succeed: \(error)")
+        }
+    }
+
     @MainActor
     func testTTSSpeakInterruptsActiveUtterance() async {
         let synth = MockSpeechSynthesizer(initiallySpeaking: true)
