@@ -1,44 +1,39 @@
+import AppKit
 import Foundation
 import XCTest
-import CoreAgent
-import ModelRuntime
 @testable import KAMIBotApp
 
 @MainActor
 final class KAMIBotAppTests: XCTestCase {
-    func testContainerBuildsAgent() {
-        let container = AppContainer()
-        _ = container.agent
-        _ = container.audioRecorderService
-        _ = container.audioStartupCoordinator
-        _ = container.modelStartupCoordinator
+    func testNotchGeometryFramesStayNearTopCenter() {
+        guard let screen = NSScreen.main else {
+            XCTFail("Expected a main screen")
+            return
+        }
+
+        let notchFrame = NotchGeometry.notchFrame(on: screen)
+        let expanded = NotchGeometry.expandedFrame(on: screen)
+
+        XCTAssertEqual(notchFrame.midX, screen.frame.midX, accuracy: 1.0)
+        XCTAssertGreaterThan(notchFrame.maxY, screen.frame.maxY - 1.0)
+        XCTAssertLessThan(expanded.maxY, notchFrame.minY)
     }
 
-    func testFloatingWindowConfigDefaults() {
-        let config = FloatingWindowConfig()
-        XCTAssertTrue(config.isBorderless)
-        XCTAssertTrue(config.isFloating)
-        XCTAssertTrue(config.isTransparent)
-        XCTAssertTrue(config.placeTopCenter)
-    }
+    func testSettingsStorePersistsRecordingDirectoryPath() {
+        let suite = "KAMIBotAppTests.SettingsStore.\(UUID().uuidString)"
+        guard let defaults = UserDefaults(suiteName: suite) else {
+            XCTFail("Failed to create isolated defaults")
+            return
+        }
+        defaults.removePersistentDomain(forName: suite)
 
-    func testStartupValidatorFailsForUnpinnedModelManifest() {
-        let config = AgentConfig(telemetryEnabled: false)
-        let descriptor = ModelDescriptor(
-            id: "llama-3.1-8b-4bit",
-            url: URL(string: "https://example.com/model.bin")!,
-            sha256: "not-pinned",
-            license: "custom"
-        )
+        let firstStore = SettingsStore(defaults: defaults)
+        firstStore.recordingsDirectoryPath = "/tmp/kami-recorder-tests"
+        firstStore.save(defaults: defaults)
 
-        let results = StartupValidator.run(config: config, modelDescriptor: descriptor)
-        let modelResult = results.first(where: { $0.id == "model-manifest" })
-        XCTAssertEqual(modelResult?.status, .fail)
-    }
+        let secondStore = SettingsStore(defaults: defaults)
+        XCTAssertEqual(secondStore.recordingsDirectoryPath, "/tmp/kami-recorder-tests")
 
-    func testSettingsStoreEnforcesTelemetryPolicy() {
-        let settings = SettingsStore()
-        settings.telemetryEnabled = true
-        XCTAssertFalse(settings.telemetryEnabled)
+        defaults.removePersistentDomain(forName: suite)
     }
 }

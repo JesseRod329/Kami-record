@@ -8,21 +8,18 @@ let package = Package(
         .executable(name: "KAMIBotApp", targets: ["KAMIBotApp"])
     ],
     dependencies: [
-        .package(path: "../Packages/CoreAgent"),
         .package(path: "../Packages/AudioPipeline"),
-        .package(path: "../Packages/ModelRuntime"),
-        .package(path: "../Packages/UIComponents"),
-        .package(path: "../Packages/VisionPipeline")
+        .package(path: "../Packages/UIComponents")
     ],
     targets: [
         .executableTarget(
             name: "KAMIBotApp",
             dependencies: [
-                "CoreAgent",
                 "AudioPipeline",
-                "ModelRuntime",
-                "UIComponents",
-                "VisionPipeline"
+                "UIComponents"
+            ],
+            resources: [
+                .process("Resources")
             ]
         ),
         .testTarget(

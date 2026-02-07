@@ -1,121 +1,74 @@
-# KAMI BOT Architecture
+# KAMI RECORD Architecture
 
-## Core Types
+## Goal
 
-```swift
-enum BMOState: Sendable {
-    case idle
-    case listening
-    case thinking
-    case speaking
-    case error
-}
+KAMI RECORD is a standalone macOS notch-style voice recorder app.
 
-enum FaceExpression: String, Sendable {
-    case happy
-    case neutral
-    case curious
-    case excited
-    case squint
-    case speaking
-}
-```
+- Menubar-first (`NSStatusItem`) interaction.
+- Top-notch hit window to toggle panel open/close.
+- Springboard animation from notch frame to expanded recorder panel.
+- Local-only recording with user-selectable output folder.
 
-```swift
-struct AgentConfig: Codable, Sendable {
-    var wakeWord: String
-    var llmModelID: String
-    var visionModelID: String
-    var sttTimeoutSeconds: Double
-    var llmTimeoutSeconds: Double
-    var telemetryEnabled: Bool
-}
-```
+## Runtime Components
 
-## Service Protocols
+### App Lifecycle
 
-```swift
-protocol WakeWordService
-protocol SpeechToTextService
-protocol TextToSpeechService
-protocol LLMService
-protocol VisionService
-protocol AudioRecorderService
-```
+- `KAMIBotApp`: SwiftUI app entry with `@NSApplicationDelegateAdaptor`.
+- `AppDelegate`: owns long-lived controllers and app state:
+  - `SettingsStore`
+  - `RecorderViewModel`
+  - `RecorderPanelWindowController`
+  - `NotchHitWindowController`
+  - `NSStatusItem`
 
-## Recorder Types
+### Windowing and Notch
 
-```swift
-enum RecorderState: Sendable {
-    case idle
-    case recording
-    case saving
-    case error
-}
+- `NotchGeometry`: canonical geometry for:
+  - notch hit frame
+  - collapsed frame
+  - expanded panel frame
+- `NotchHitWindowController`: transparent borderless window anchored to top center.
+  - captures notch clicks
+  - toggles panel state
+- `RecorderPanelWindowController`: borderless panel host for recorder UI.
+  - `expand(from:on:)` springboards from notch frame
+  - `collapse(to:on:)` animates back toward notch
+- `PanelAnimator`: shared AppKit animation helper.
 
-struct RecordingArtifact: Sendable {
-    let fileURL: URL
-    let duration: TimeInterval
-    let createdAt: Date
-}
-```
+### Recorder UI
 
-## Agent API
+- `RecorderView`:
+  - record/stop primary action
+  - elapsed timer + level meter
+  - save-folder picker
+  - open-folder shortcut
+  - explicit close button to collapse panel
+- `RecorderViewModel`:
+  - owns recorder state machine (`idle`, `recording`, `saving`, `error`)
+  - updates elapsed timer and synthetic level meter
+  - applies output-directory changes at runtime
 
-```swift
-actor BMOAgent {
-    func start() async
-    func stop() async
-    func handleWakeWordEvent() async
-    func handleUserUtterance(_ utterance: String) async
-    func speak(_ text: String) async
-}
-```
+### Persistence
 
-## UI Model
-
-```swift
-@MainActor @Observable final class BMOViewModel
-```
-
-The view model consumes `AsyncStream<AgentEvent>` from `BMOAgent`.
+- `SettingsStore` persists recording output directory path in `UserDefaults`.
+- `AudioPipeline.LocalAudioRecorderService`:
+  - validates microphone permission
+  - records AAC (`.m4a`) files
+  - supports runtime output-directory switching
+  - exposes latest recording metadata
 
 ## Data Flow
 
-1. Wake word event arrives.
-2. Agent switches `idle -> listening` and captures utterance.
-3. Agent routes prompt (text vs vision) then enters `thinking`.
-4. LLM response is generated.
-5. Agent enters `speaking`, emits face changes, and plays TTS.
-6. Agent returns to `idle`.
+1. App launches, sets accessory activation policy.
+2. Menubar icon + notch hit window are created.
+3. User clicks notch (or menubar icon) to toggle panel.
+4. On `Record`, `RecorderViewModel` starts recorder service.
+5. Service writes file to configured output directory.
+6. On `Stop`, service finalizes file and returns `RecordingArtifact`.
+7. ViewModel publishes latest artifact and returns to idle.
 
-Timeout and cancellation guards:
-- STT and LLM steps run with explicit timeout wrappers.
-- In-flight turn tasks are canceled on `stop()` and the agent force-recovers to `idle`.
+## Error Handling
 
-## Recorder Flow
-
-1. User taps `Record` in the notch-style recorder bar.
-2. `RecorderViewModel` requests `AudioRecorderService.startRecording()`.
-3. `LocalAudioRecorderService` validates microphone permission and starts an AAC recorder.
-4. Audio writes to `captures/YYYY-MM-DD-HHMMSS.m4a`.
-5. User taps `Stop`; service transitions `recording -> saving`, finalizes, and returns `RecordingArtifact`.
-6. View model updates latest capture metadata and returns to `idle`.
-
-Failure handling:
-- Denied/restricted microphone permission fails fast with `AudioPipelineError.microphoneDenied`.
-- Canceling an in-progress recording deletes the temporary capture file before returning to `idle`.
-
-## UI and Windowing
-
-- `GlassSurface` provides Tahoe-first liquid-style panels with material fallback.
-- `BMOFaceView` uses `matchedGeometryEffect` for expression transitions.
-- `FloatingWindowStyler` configures a borderless, transparent, always-on-top desktop companion window.
-- `FloatingWindowStyler` supports top-center placement for the notch-style recorder presentation.
-- `AudioStartupCoordinator` enforces microphone permission before activating wake-word listening.
-- `LocalAudioRecorderService` provides one-tap start/stop/cancel capture with local file persistence.
-- `ModelStartupCoordinator` performs first-run model download and hash verification before LLM use.
-- `AVSpeechSynthesizerService` supports interruption-aware speaking and explicit stop behavior.
-- `SettingsStore` persists wake-word and vision toggles while enforcing telemetry-off policy.
-- `StartupValidator` gates agent startup on policy and manifest checks.
-- `SnapshotVisionService` now supports on-demand frame-capture source wiring for v1.1.
+- Microphone denied/restricted -> `AudioPipelineError.microphoneDenied`.
+- Invalid output directory -> `AudioRecorderError.invalidOutputDirectory`.
+- Save/start failures -> surfaced to view model and shown in UI.

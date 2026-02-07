@@ -16,19 +16,17 @@ KAMI RECORD is a privacy-first, notch-style macOS recorder for instant voice mem
 ## Features
 
 - One-tap `Record` / `Stop` capture flow.
-- Notch-inspired floating liquid-glass UI.
-- Local-first capture storage in `captures/`.
+- Menubar app with custom logo icon.
+- Notch hit-zone + springboard expand/collapse panel animation.
+- Local-first capture storage in your selected folder (default `~/Downloads/KamiRecord`).
 - Mic-permission aware startup and error handling.
-- Quick recorder mode plus existing BMO mode toggle.
+- Standalone recorder workflow only (no BMO mode toggle).
 
 ## Project Layout
 
-- `KAMIBotApp/`: SwiftUI app shell and recorder/BMO view models.
+- `KAMIBotApp/`: SwiftUI + AppKit menubar/notch app shell and recorder view model.
 - `Packages/AudioPipeline/`: recorder service, microphone permission, STT/TTS services.
-- `Packages/CoreAgent/`: shared agent state and protocols.
 - `Packages/UIComponents/`: glass UI components and face visuals.
-- `Packages/ModelRuntime/`: local model runtime lifecycle.
-- `Packages/VisionPipeline/`: optional snapshot vision services.
 
 ## Run Locally
 

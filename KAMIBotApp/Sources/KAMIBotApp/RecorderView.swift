@@ -5,6 +5,7 @@ import UIComponents
 struct RecorderView: View {
     @Bindable var viewModel: RecorderViewModel
     @Bindable var settingsStore: SettingsStore
+    var onRequestClose: (() -> Void)? = nil
     @State private var hasSprungIn = false
     @State private var tapBump = false
 
@@ -30,6 +31,18 @@ struct RecorderView: View {
                             .padding(.vertical, 4)
                             .background(statusColor.gradient)
                             .clipShape(Capsule())
+
+                        if let onRequestClose {
+                            Button {
+                                onRequestClose()
+                            } label: {
+                                Image(systemName: "xmark.circle.fill")
+                                    .font(.title3)
+                                    .foregroundStyle(.white.opacity(0.82))
+                            }
+                            .buttonStyle(.plain)
+                            .help("Collapse")
+                        }
                     }
 
                     HStack(spacing: 16) {

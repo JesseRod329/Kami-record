@@ -7,13 +7,10 @@ struct SettingsView: View {
 
     var body: some View {
         VStack(alignment: .leading, spacing: 16) {
-            Text("KAMI BOT Settings")
+            Text("KAMI RECORD Settings")
                 .font(.title3.weight(.semibold))
 
             Form {
-                TextField("Wake word", text: $settingsStore.wakeWord)
-                Toggle("Enable vision (v1.1 path)", isOn: $settingsStore.visionEnabled)
-
                 VStack(alignment: .leading, spacing: 8) {
                     Text("Recordings folder")
                         .font(.caption)
@@ -30,14 +27,6 @@ struct SettingsView: View {
                     }
                     .font(.caption)
                 }
-
-                VStack(alignment: .leading, spacing: 4) {
-                    Toggle("Enable telemetry", isOn: $settingsStore.telemetryEnabled)
-                        .disabled(true)
-                    Text("Telemetry is enforced OFF by project policy.")
-                        .font(.caption)
-                        .foregroundStyle(.secondary)
-                }
             }
             .formStyle(.grouped)
 
@@ -50,7 +39,7 @@ struct SettingsView: View {
                 .keyboardShortcut(.defaultAction)
             }
 
-            Text("Restart KAMI BOT after changing settings so startup checks and model setup reinitialize.")
+            Text("The new save folder is applied immediately for new recordings.")
                 .font(.caption)
                 .foregroundStyle(.secondary)
         }
